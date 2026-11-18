@@ -52,8 +52,9 @@ def normalize_name(name: str) -> str:
     - Split into words, drop the ones in settings.FILLER_WORDS, and join the rest
       with single spaces.
     """
-    
-    cleaned_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+
+    cleaned_name = unicodedata.normalize("NFKD", name)
+    cleaned_name = cleaned_name.encode("ascii", "ignore").decode()
     cleaned_name = cleaned_name.lower()
     cleaned_name = re.sub(r"[^a-z0-9 ]+", " ", cleaned_name)
     words = cleaned_name.split()
@@ -82,7 +83,8 @@ def top_candidates(name: str, choices: list[str], limit: int = 3) -> list[tuple]
     """
     normalized_name = normalize_name(name)
     normalized_choices = [normalize_name(choice) for choice in choices]
-    processed = process.extract(normalized_name, normalized_choices, scorer=fuzz.token_sort_ratio, limit=limit)
+    processed = process.extract(normalized_name, normalized_choices,
+                                scorer=fuzz.token_sort_ratio, limit=limit)
     return [(choices[index], round(score)) for match, score, index in processed]
 
 
@@ -118,7 +120,7 @@ def match_items(menus: pd.DataFrame, decisions: pd.DataFrame) -> pd.DataFrame:
     - `suggestions`: top_candidates(item, the names on the list so far of the same
       `kind`) — a list of (name, score) pairs. `score` is the first pair's score
       (0 when there are no suggestions).
-    
+
     - `status` and `matched_to`:
         - "owner" when the owner has decided this (cafe, item): `matched_to` is
           their answer — or the item's own name when they answered NEW_ITEM.
@@ -134,14 +136,14 @@ def match_items(menus: pd.DataFrame, decisions: pd.DataFrame) -> pd.DataFrame:
 
     - The list so far: `ours` <- the rows of `menus` whose cafe is OUR_CAFE.
       `pool = dict(zip(ours["item"], ours["kind"]))` — {name: kind}.
-      
+
     - The owner's answers: `answers` — a dict {(cafe, item): matched_to}, one
       entry per row of `decisions` (loop over `decisions.to_dict("records")`).
-      
+
     - The rival items, once each, in order: `theirs` <- the rows of `menus` whose
       cafe is *not* OUR_CAFE; `rivals = theirs[["cafe", "item", "kind"]]
       .drop_duplicates()`.
-      
+
     - `rows = []`, then `for cafe, item, kind in rivals.itertuples(index=False):`
         - `choices` <- the names in `pool` whose kind equals `kind`
           (a list comprehension over `pool.items()`).
@@ -159,48 +161,49 @@ def match_items(menus: pd.DataFrame, decisions: pd.DataFrame) -> pd.DataFrame:
     - `return pd.DataFrame(rows, columns=[...the seven columns...])` — naming the
       columns keeps them in order.
     """
-    
+
     ours = menus[menus["cafe"] == OUR_CAFE]
     theirs = menus[menus["cafe"] != OUR_CAFE]
     rivals = theirs[["cafe", "item", "kind"]].drop_duplicates()
-    
+
     pool = dict(zip(ours["item"], ours["kind"]))
     answers = dict()
     for row in decisions.itertuples():
-      answers[(row.cafe, row.item)] = row.matched_to
-    
+        answers[(row.cafe, row.item)] = row.matched_to
+
     rows = []
     for cafe, item, kind in rivals.itertuples(index=False):
-      choices = [name for name, k in pool.items() if k==kind]
-      suggestions = top_candidates(item, choices)
-      score = suggestions[0][1] if suggestions else 0
-      
-      if (cafe, item) in answers:
-        status = "owner"
-        answer = answers[(cafe, item)]
-        matched_to = item if answer == NEW_ITEM else answer
-      elif score >= AUTO_MATCH:
-        status = "auto"
-        matched_to = suggestions[0][0]
-      else:
-        status = "unreviewed"
-        matched_to = None
-      
-      if (matched_to is not None) and (matched_to not in pool):
-        pool[matched_to] = kind
-      
-      rows.append({
-          "cafe": cafe,
-          "item": item,
-          "kind": kind,
-          "status": status,
-          "matched_to": matched_to,
-          "score": score,
-          "suggestions": suggestions,
-      })
+        choices = [name for name, k in pool.items() if k == kind]
+        suggestions = top_candidates(item, choices)
+        score = suggestions[0][1] if suggestions else 0
 
-    return pd.DataFrame(rows, columns=["cafe", "item", "kind", "status", "matched_to", "score", "suggestions"])
-      
+        if (cafe, item) in answers:
+            status = "owner"
+            answer = answers[(cafe, item)]
+            matched_to = item if answer == NEW_ITEM else answer
+        elif score >= AUTO_MATCH:
+            status = "auto"
+            matched_to = suggestions[0][0]
+        else:
+            status = "unreviewed"
+            matched_to = None
+
+        if (matched_to is not None) and (matched_to not in pool):
+            pool[matched_to] = kind
+
+        rows.append({
+            "cafe": cafe,
+            "item": item,
+            "kind": kind,
+            "status": status,
+            "matched_to": matched_to,
+            "score": score,
+            "suggestions": suggestions,
+        })
+
+    columns = ["cafe", "item", "kind", "status", "matched_to", "score", "suggestions"]
+    return pd.DataFrame(rows, columns=columns)
+
 
 def record_decision(decisions: pd.DataFrame, cafe: str, item: str,
                     matched_to: str) -> pd.DataFrame:
@@ -219,8 +222,7 @@ def record_decision(decisions: pd.DataFrame, cafe: str, item: str,
     decision = {"cafe": cafe, "item": item, "matched_to": matched_to}
     decision = pd.DataFrame([decision], columns=DECISION_COLUMNS)
     decisions = decisions[~((decisions["cafe"] == cafe) & (decisions["item"] == item))]
-    
+
     ret = pd.concat([decisions, decision], ignore_index=True)[DECISION_COLUMNS]
-    
+
     return ret
-    

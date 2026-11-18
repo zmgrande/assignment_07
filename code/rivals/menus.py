@@ -69,11 +69,11 @@ def build_dataset(rival_rows: list[dict]) -> pd.DataFrame:
     """
     our_menu = load_our_menu()
     rival_menus = menus_table(rival_rows)
-    
+
     master = pd.concat([our_menu, rival_menus], ignore_index=True)
     categories = pd.read_csv(CATEGORIES_FILE)
-    
+
     master = add_kinds(master, categories)
     master = master.reindex(columns=MENU_COLUMNS)
-    
+
     return master

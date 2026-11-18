@@ -1,8 +1,94 @@
-Write your reflection here.
+What I learned
 
-See reflection.md for what makes a good reflection — be specific, use the
-terminology from this assignment (HTML element, CSS selector, class and id
-selectors, sibling selector, inner_text, attribute, headless browser, waiting for
-JavaScript, crawling, pagination, read_html, melt, fuzzy matching, normalization,
-threshold, human in the loop, merge indicator, gap analysis), and make it
-actionable.
+Most of what I learned was probably in scraping and matching:
+- Each rival site needed a different technique, and I now know how to pick one
+  by looking at how the page is built. Lakeshore is static HTML cards, so I used
+  CSS selectors with Playwright's query_selector_all: a class selector
+  (h2.menu-section__title) for the category headings, then the general sibling
+  selector "~ div.menu-grid" to get the grid that comes after each heading. Using
+  "~ *" would have found the <p> note first, which taught me that sibling
+  selectors match any later sibling, not just the next one.
+- Hilltop puts its menu in real <table> elements, so pd.read_html(StringIO(
+  page.content())) turned every table into a DataFrame. I paired them with the
+  "#menu h2" headings (an id selector) using zip(). Then .melt(id_vars="Item",
+  var_name="size", value_name="price") turned the wide S/M/L columns into long
+  rows, one per size. Melt is how you go from "a column per size" to "a row per
+  size".
+- Canal Street draws its menu with JavaScript, so the HTML Playwright first gets
+  has no menu in it. I learned I have to wait for JavaScript: wait_for_selector
+  after clicking "Show full menu". For pagination I loop while the "Show more"
+  button is_visible(), saving the card count before each click and using
+  wait_for_function until the count goes up. After that I crawl: I collect each
+  card's href attribute with get_attribute, build an absolute URL with urljoin,
+  and visit each item page. The browser runs headless, which is why the tests
+  can run it with no window.
+- Cleaning: inner_text() returns text written for a person to read, with badges
+  like "NEW!", dietary tags like "V GF", and several prices on one line.
+  clean_card_lines filters out NOISE lines with all(w in NOISE for w in
+  line.split()), and parse_price_line uses re.findall with an optional capture
+  group, ([SML])?, so a price with no size letter becomes "Each". One bug I
+  hit: I split on the literal two characters "\\n" instead of the real newline
+  "\n", so every card came out as one line. Now I know an escaped backslash in a
+  docstring is not the same string as the escape sequence in my code.
+- Building the menu table: a category lookup is a left merge, so the menus keep
+  every row and any category without a match has a missing kind (NaN). I also
+  combined the café DataFrames with pd.concat, which takes a list, and learned
+  that reindex returns a new DataFrame, so I have to assign the result.
+
+Matching
+- Fuzzy matching: top_candidates normalizes the names (normalization: lowercase,
+  punctuation removed) and then calls rapidfuzz's process.extract with
+  fuzz.token_sort_ratio. That scorer sorts the words first, so "Latte Caffe" and
+  "Caffe Latte" score the same. The thresholds sort each score into a band:
+  AUTO_MATCH = 90 is matched with no question, REVIEW = 70 preselects the top
+  suggestion, and anything lower goes to the owner. This is the human-in-the-loop
+  design. The algorithm handles the easy cases and the owner decides the
+  uncertain ones, and record_decision saves their answers to item_matches.csv.
+- The "status" column ("owner" / "auto" / "unreviewed") is not stored anywhere in
+  the input. match_items creates it to describe its own output. The "owner" test
+  is just whether (cafe, item) is a key in the answers dict. I had been comparing
+  the stored value to "owner", and that comparison can never be true.
+- Growing the pool: when the owner marks an item NEW_ITEM, it is matched to its
+  own name and added to the pool. That is how Hilltop's "Avocado Toast" can then
+  match Lakeshore's. I first wrote the condition backwards, so I learned that the
+  logic of one ternary can change behaviour further down the pipeline.
+- dict(zip(keys, values)) keeps the last value when a key repeats. That was
+  harmless for item -> kind, but the reversed order (kind -> item) collapsed 43
+  rows into just 2 keys.
+
+
+Some of the things I struggled with:
+1. Assigning a boolean condition where the filtered DataFrame should go
+   (compare_prices: master = master["our_price"].dropna() & ...). The fix
+   pattern is keep = <mask>; df = df[keep].copy().
+2. Filter direction. In record_decision I kept the rows I meant to drop. I need
+   ~(...) to keep everything except the matching rows.
+3. A string where a list of strings belongs: on=["cafe, item"] is ONE column
+   name. Also df["a", "b"] vs df[["a", "b"]] for selecting several columns.
+4. Overwriting a variable I still needed: reusing "choices" for the normalized
+   names in top_candidates, so the results came back lowercase.
+5. Indentation: a return inside the for loop made match_items stop after one
+   row.
+6. Forgetting to exclude our café from rival-only values (rivals list, rival_avg).
+7. Mixing up where values live: "unreviewed" is a status label, while in the
+   menus the same rows are simply NaN in canonical.
+8. Details in the docstring I skipped: column order, a plain index
+   (reset_index), not modifying the input, and edge cases such as an empty
+   decisions DataFrame. A first owner decision was lost because I returned early
+   when no decisions existed yet.
+
+What I can do to practice/for future:
+- Before writing each function, list its output contract from the docstring:
+  exact columns and their order, the index, the dtypes, and whether the input is
+  changed. Check my code against that list before running the tests.
+- Practice boolean masks and merges with small toy DataFrames: write the mask,
+  print it, then filter. Try ~, .isin, and merge with on=, how=, and
+  indicator=True, and predict the result before running it.
+- Rerun the single failing test (pytest -k <name>) and read the first error in
+  the traceback before changing code, instead of guessing.
+- Experiment with rapidfuzz scorers (ratio, partial_ratio, token_sort_ratio,
+  token_set_ratio) on our real item names to see where each one gives false
+  positives. Then I can explain why a threshold of 90 is reasonable.
+- Use playwright codegen and the Chrome Inspect panel first on any new site, to
+  decide whether it needs static selectors, read_html, or waiting for
+  JavaScript before I write a scraper.

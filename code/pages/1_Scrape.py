@@ -48,7 +48,8 @@ st.markdown("Pick the cafés to scrape. Each run replaces the saved dataset.")
 #                                    Python error, so you can fix it.
 
 cafe_options = list(CAFES)
-cafes = st.multiselect(label="Cafés", key="cafes", options=cafe_options, default=cafe_options)
+cafes = st.multiselect(label="Cafés", key="cafes",
+                       options=cafe_options, default=cafe_options)
 scrape = st.button(label="Scrape", key="scrape")
 if scrape and (len(cafes) >= 1):
     with st.spinner(text="One moment..."):

@@ -35,7 +35,7 @@ def clean_price(text: str) -> float:
     - Remove the dollar sign and any commas with `.replace()`.
     - `.strip()` the spaces, then convert with `float()`.
     """
-    
+
     return float(text.replace("$", "").replace(",", "").strip())
 
 
@@ -96,6 +96,7 @@ def parse_price_line(line: str) -> list[tuple[str, float]]:
 
     return results
 
+
 def card_rows(cafe: str, category: str, card_text: str) -> list[dict]:
     """One row per size for one menu card.
 
@@ -118,8 +119,12 @@ def card_rows(cafe: str, category: str, card_text: str) -> list[dict]:
         if line[0] == "$" or "$" in line:
             price_line = line
             break
-    
+
     item_name = lines[0]
     size_and_prices = parse_price_line(price_line)
-    
-    return [{"cafe": cafe, "category": category, "item": item_name, "size": size, "price": price} for size, price in size_and_prices]
+
+    return [
+        {"cafe": cafe, "category": category, "item": item_name,
+         "size": size, "price": price}
+        for size, price in size_and_prices
+    ]

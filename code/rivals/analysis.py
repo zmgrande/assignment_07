@@ -37,9 +37,11 @@ def add_canonical(menus: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
     Every row of `menus` is kept, in order; `menus` itself is not changed.
     """
     master = pd.merge(left=menus,
-                         right=matches[["cafe", "item", "matched_to"]],
-                         how="left", on=["cafe", "item"]).rename(columns={"matched_to": "canonical"})
-    master["canonical"] = master["canonical"].mask(master["cafe"] == OUR_CAFE, master["item"])
+                      right=matches[["cafe", "item", "matched_to"]],
+                      how="left", on=["cafe", "item"])
+    master = master.rename(columns={"matched_to": "canonical"})
+    ours = master["cafe"] == OUR_CAFE
+    master["canonical"] = master["canonical"].mask(ours, master["item"])
     return master
 
 
@@ -104,11 +106,11 @@ def compare_prices(prices: pd.DataFrame) -> pd.DataFrame:
     Plain index.
     """
     rivals = [rival for rival in prices.columns if rival != OUR_CAFE]
-    
+
     master = prices.rename(columns={OUR_CAFE: "our_price"})
     keep = master["our_price"].notna() & master[rivals].notna().any(axis=1)
     master = master[keep].copy()
-    
+
     master["rival_avg"] = master[rivals].mean(axis=1).round(2)
     master["our_position"] = master.apply(
         lambda row: price_position(low=row[rivals].min(),
@@ -117,7 +119,7 @@ def compare_prices(prices: pd.DataFrame) -> pd.DataFrame:
                                    ours=row["our_price"]),
         axis=1
     )
-    
+
     master = master[["our_price", *rivals, "rival_avg", "our_position"]]
     return master.reset_index()
 
@@ -138,7 +140,7 @@ def gap_analysis(menus: pd.DataFrame) -> pd.DataFrame:
     Sorted by `where` ("only them" first, then "only us", then "both"), then
     `rivals` (most first), then `canonical`; plain index.
     """
-    
+
     known = menus.dropna(subset=["canonical"])
 
     ours = known.loc[known["cafe"] == OUR_CAFE, ["canonical", "kind"]].drop_duplicates()
@@ -165,4 +167,5 @@ def gap_analysis(menus: pd.DataFrame) -> pd.DataFrame:
         key=lambda col: col.map(order) if col.name == "where" else col,
     )
 
-    return out[["canonical", "kind", "where", "rivals", "sold_by"]].reset_index(drop=True)
+    out = out[["canonical", "kind", "where", "rivals", "sold_by"]]
+    return out.reset_index(drop=True)

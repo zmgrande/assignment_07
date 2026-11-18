@@ -64,7 +64,8 @@ if "skipped" not in st.session_state:
 
 waiting = int((matches["status"] == "unreviewed").sum())
 if waiting:
-    st.warning(f"There are {waiting} match(es) that are unreviewed, finish them on the Review Matches page.")
+    st.warning(f"There are {waiting} match(es) that are unreviewed and left out. "
+               "Finish them on the Review Matches page.")
 
 # 2. THE ANALYSIS (all of it is in the package — the page only calls it)
 #    menus <- add_canonical(menus, matches)
@@ -103,7 +104,8 @@ with prices_tab:
     m5.metric("Priced above the market", above)
 
     p = sorted(comparison["canonical"].unique().tolist())
-    products = st.multiselect("Products", options=p, key="products", placeholder="All Products")
+    products = st.multiselect("Products", options=p, key="products",
+                              placeholder="All Products")
     selected_products = products if products else p
 
     shown = comparison[comparison["canonical"].isin(selected_products)]
