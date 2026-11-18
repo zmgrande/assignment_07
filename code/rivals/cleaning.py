@@ -35,8 +35,8 @@ def clean_price(text: str) -> float:
     - Remove the dollar sign and any commas with `.replace()`.
     - `.strip()` the spaces, then convert with `float()`.
     """
-    # TODO: your code here
-    pass
+    
+    return float(text.replace("$", "").replace(",", "").strip())
 
 
 def clean_card_lines(text: str) -> list[str]:
@@ -55,8 +55,14 @@ def clean_card_lines(text: str) -> list[str]:
     - Skip it if every word in it is in NOISE: `all(w in NOISE for w in line.split())`.
     - Otherwise append it to a list, and return the list.
     """
-    # TODO: your code here
-    pass
+    lines = text.split("\n")
+    cleaned_lines = []
+    for line in lines:
+        add = line.strip()
+        if add and not all(w in NOISE for w in add.split()):
+            cleaned_lines.append(add)
+
+    return cleaned_lines
 
 
 def parse_price_line(line: str) -> list[tuple[str, float]]:
@@ -79,9 +85,16 @@ def parse_price_line(line: str) -> list[tuple[str, float]]:
     - Loop over the matches. Use "Each" when size is "", and `clean_price()` on the
       price. Return the list of pairs.
     """
-    # TODO: your code here
-    pass
+    prices = re.findall(r"([SML])?\s*(\$[\d.,]+)", line)
+    results = []
+    for size, price in prices:
+        if size == "":
+            new_size = "Each"
+        else:
+            new_size = size
+        results.append((new_size, clean_price(price)))
 
+    return results
 
 def card_rows(cafe: str, category: str, card_text: str) -> list[dict]:
     """One row per size for one menu card.
@@ -100,5 +113,13 @@ def card_rows(cafe: str, category: str, card_text: str) -> list[dict]:
     - `parse_price_line()` the price line, and build one dict per (size, price)
       pair with the five keys above. Return the list.
     """
-    # TODO: your code here
-    pass
+    lines = clean_card_lines(card_text)
+    for line in lines:
+        if line[0] == "$" or "$" in line:
+            price_line = line
+            break
+    
+    item_name = lines[0]
+    size_and_prices = parse_price_line(price_line)
+    
+    return [{"cafe": cafe, "category": category, "item": item_name, "size": size, "price": price} for size, price in size_and_prices]
